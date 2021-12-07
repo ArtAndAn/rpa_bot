@@ -75,7 +75,7 @@ def random_agency_details():
         browser.wait_until_page_contains_element(locator='//*[@id="business-case-pdf"]/a')
         browser.click_link(locator='//*[@id="business-case-pdf"]/a')
         browser.wait_until_page_does_not_contain_element(locator='//*[@id="business-case-pdf"]/span')
-        sleep(1.5)
+        sleep(2)
         browser.close_browser()
 
     table_data = []
@@ -123,7 +123,9 @@ def compare_pdfs():
             if row['Investment title'] == investment_name and row['UII'] == uii_number:
                 passed_validation = True
         if not passed_validation:
-            raise AssertionError('PDF and Excel files assertion error')
+            raise AssertionError(f'PDF and Excel files assertion error'
+                                 f'Investment name - {investment_name}'
+                                 f'UII number - {uii_number}')
 
 
 def main():

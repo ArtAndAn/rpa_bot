@@ -1,6 +1,14 @@
 tasks:
   Analyze agencies data:
-    shell: python -m robot --report NONE --outputdir output --logtitle "Task log" tasks.robot
+    command:
+      - python
+      - task.py
+
+condaConfigFile: conda.yaml
 artifactsDir: output
 PATH:
   - .
+PYTHONPATH:
+  - .
+ignoreFiles:
+  - .gitignore
