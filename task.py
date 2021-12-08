@@ -5,14 +5,16 @@ from RPA.Browser.Selenium import Selenium
 from RPA.Excel.Files import Files
 from RPA.FileSystem import FileSystem
 from RPA.PDF import PDF
+from RPA.Robocorp.WorkItems import WorkItems
 from robot.libraries.BuiltIn import BuiltIn
-from robot.libraries.OperatingSystem import OperatingSystem
 
 browser = Selenium(timeout=timedelta(10))
 browser.set_download_directory(directory=FileSystem().absolute_path(path='outer'))
 excel_manager = Files()
 pdf = PDF()
 logger = BuiltIn()
+work_items = WorkItems()
+work_items.get_input_work_item()
 
 
 def fill_up_agencies():
@@ -26,7 +28,7 @@ def fill_up_agencies():
     file.set_cell_value(row=1, column='A', value='Agency')
     file.set_cell_value(row=1, column='B', value='Spending')
 
-    site_url = OperatingSystem().get_environment_variable(name='SITE_URL', default='https://itdashboard.gov/')
+    site_url = work_items.get_work_item_variable(name='SITE_URL', default='https://itdashboard.gov/')
     browser.open_available_browser(url=site_url)
     browser.click_link(locator='link:DIVE IN')
     browser.wait_until_page_contains_element(locator='id:agency-tiles-widget >> class:col-sm-12')
@@ -49,7 +51,7 @@ def detailed_agency_investments():
     filling it with investment table data
     Downloading PDF file if investment has a link and comparing its data with table data
     """
-    agency_name = OperatingSystem().get_environment_variable(name='AGENCY_NAME', default='U.S. Army Corps of Engineers')
+    agency_name = work_items.get_work_item_variable(name='AGENCY_NAME', default='U.S. Army Corps of Engineers')
     logger.log(message=f'Started detailed agency investments function for -- {agency_name} -- agency', console=True)
 
     file = excel_manager.open_workbook('outer/data.xlsx')
@@ -107,10 +109,10 @@ def detailed_agency_investments():
         uii_from_pdf = pdf.find_text(locator=f'regex:{uii_search_key}', pagenum=1)[0] \
             .anchor.replace(f'{uii_search_key} (UII): ', '')
 
-        if investment_title_from_table != investment_title_from_pdf:
+        if investment_title_from_table.split() != investment_title_from_pdf.split():
             logger.log(message=f'Row -- {row_data["Investment title"]} -- investment titles are not equal',
                        level='ERROR', console=True)
-        elif uii_from_table != uii_from_pdf:
+        elif uii_from_table.split() != uii_from_pdf.split():
             logger.log(message=f'Row -- {row_data["Investment title"]} -- UII numbers are not equal',
                        level='ERROR', console=True)
         else:
@@ -122,6 +124,7 @@ def detailed_agency_investments():
 
 def main():
     try:
+        logger.log(message=f'Starting robot with variables -- {work_items.get_work_item_variables()}', console=True)
         fill_up_agencies()
         detailed_agency_investments()
     finally:
