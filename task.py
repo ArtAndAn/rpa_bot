@@ -59,18 +59,26 @@ def detailed_agency_investments():
 
     investments_table_rows = collect_investments_table_rows(agency_name)
     for row in investments_table_rows:
-        row_data = add_investment_data_to_excel(agency_name, file, row)
+        process_row_data(agency_name, file, row)
 
-        individual_investment_link = browser.find_elements(locator='tag:a', parent=row)
-        if not individual_investment_link:
-            logger.log(message=f'Row -- {row_data["Investment title"]} -- has no link', console=True)
-            continue
-        logger.log(message=f'Row -- {row_data["Investment title"]} -- has a link', console=True)
-
-        download_pdf_file(individual_investment_link, row_data)
-        compare_investment_data(row_data)
     file.save()
     logger.log(message='Finished detailed agency investments function', console=True)
+
+
+def process_row_data(agency_name, file, row):
+    """
+    Function for collecting row data, downloading pdf data if row has a link and comparing its data with table data
+    """
+    row_data = add_investment_data_to_excel(agency_name, file, row)
+
+    individual_investment_link = browser.find_elements(locator='tag:a', parent=row)
+    if not individual_investment_link:
+        logger.log(message=f'Row -- {row_data["Investment title"]} -- has no link', console=True)
+        return
+    logger.log(message=f'Row -- {row_data["Investment title"]} -- has a link', console=True)
+
+    download_pdf_file(individual_investment_link, row_data)
+    compare_investment_data(row_data)
 
 
 def collect_investments_table_rows(agency_name):
@@ -115,7 +123,7 @@ def download_pdf_file(individual_investment_link, row_data):
     browser.wait_until_page_contains_element(locator='id:business-case-pdf')
     browser.click_link(locator='id:business-case-pdf >> tag:a')
     browser.wait_until_page_does_not_contain_element(locator='id:business-case-pdf >> tag:span')
-    sleep(2)
+    sleep(3)
     browser.close_browser()
     logger.log(message=f'Row -- {row_data["Investment title"]} -- PDF file downloaded', console=True)
 
