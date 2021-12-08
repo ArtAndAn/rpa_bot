@@ -57,6 +57,26 @@ def detailed_agency_investments():
     file = excel_manager.open_workbook('outer/data.xlsx')
     file.create_worksheet(name=agency_name)
 
+    investments_table_rows = collect_investments_table_rows(agency_name)
+    for row in investments_table_rows:
+        row_data = add_investment_data_to_excel(agency_name, file, row)
+
+        individual_investment_link = browser.find_elements(locator='tag:a', parent=row)
+        if not individual_investment_link:
+            logger.log(message=f'Row -- {row_data["Investment title"]} -- has no link', console=True)
+            continue
+        logger.log(message=f'Row -- {row_data["Investment title"]} -- has a link', console=True)
+
+        download_pdf_file(individual_investment_link, row_data)
+        compare_investment_data(row_data)
+    file.save()
+    logger.log(message='Finished detailed agency investments function', console=True)
+
+
+def collect_investments_table_rows(agency_name):
+    """
+    Function for collecting table data for specified in env. variable Agency
+    """
     browser.click_link(locator=f'partial link:{agency_name}')
     browser.wait_until_page_contains_element(locator='name:investments-table-object_length')
     browser.select_from_list_by_value('name:investments-table-object_length', '-1')
@@ -64,62 +84,66 @@ def detailed_agency_investments():
 
     investments_table_rows = browser.find_elements(locator='id:investments-table-object >> tag:tbody >> tag:tr')
     logger.log(message='Collected investments table rows data', console=True)
+    return investments_table_rows
 
-    for row in investments_table_rows:
-        cells_data = browser.find_elements(locator='tag:td', parent=row)
-        row_data = {'UII': cells_data[0].text,
-                    'Bureau': cells_data[1].text,
-                    'Investment title': cells_data[2].text,
-                    'Total FY2021 Spending($M)': cells_data[3].text,
-                    'Type': cells_data[4].text,
-                    'CIO Rating': cells_data[5].text,
-                    '# of Projects': cells_data[6].text}
-        file.append_worksheet(name=agency_name, content=row_data, header=True)
 
-        logger.log(message=f'Row -- {row_data["Investment title"]} -- data recorded to excel', console=True)
+def add_investment_data_to_excel(agency_name, file, row):
+    """
+    Function for collecting table row cells data and writing it to excel file
+    :return: dict with row data
+    """
+    cells_data = browser.find_elements(locator='tag:td', parent=row)
+    row_data = {'UII': cells_data[0].text,
+                'Bureau': cells_data[1].text,
+                'Investment title': cells_data[2].text,
+                'Total FY2021 Spending($M)': cells_data[3].text,
+                'Type': cells_data[4].text,
+                'CIO Rating': cells_data[5].text,
+                '# of Projects': cells_data[6].text}
+    file.append_worksheet(name=agency_name, content=row_data, header=True)
+    logger.log(message=f'Row -- {row_data["Investment title"]} -- data recorded to excel', console=True)
+    return row_data
 
-        individual_investment_link = browser.find_elements(locator='tag:a', parent=row)
-        if not individual_investment_link:
-            logger.log(message=f'Row -- {row_data["Investment title"]} -- has no link', console=True)
-            continue
 
-        logger.log(message=f'Row -- {row_data["Investment title"]} -- has a link', console=True)
+def download_pdf_file(individual_investment_link, row_data):
+    """
+    Function for downloading pdf file for row with a link
+    """
+    detailed_investment_data = browser.get_element_attribute(locator=individual_investment_link[0],
+                                                             attribute='href')
+    browser.open_available_browser(url=detailed_investment_data)
+    browser.wait_until_page_contains_element(locator='id:business-case-pdf')
+    browser.click_link(locator='id:business-case-pdf >> tag:a')
+    browser.wait_until_page_does_not_contain_element(locator='id:business-case-pdf >> tag:span')
+    sleep(2)
+    browser.close_browser()
+    logger.log(message=f'Row -- {row_data["Investment title"]} -- PDF file downloaded', console=True)
 
-        detailed_investment_data = browser.get_element_attribute(locator=individual_investment_link[0],
-                                                                 attribute='href')
-        browser.open_available_browser(url=detailed_investment_data)
-        browser.wait_until_page_contains_element(locator='id:business-case-pdf')
-        browser.click_link(locator='id:business-case-pdf >> tag:a')
-        browser.wait_until_page_does_not_contain_element(locator='id:business-case-pdf >> tag:span')
-        sleep(2)
-        browser.close_browser()
 
-        logger.log(message=f'Row -- {row_data["Investment title"]} -- PDF file downloaded', console=True)
+def compare_investment_data(row_data):
+    """
+    Function for comparing data from pdf with data from the table
+    """
+    investment_title_from_table = row_data['Investment title']
+    uii_from_table = row_data['UII']
 
-        investment_title_from_table = row_data['Investment title']
-        uii_from_table = row_data['UII']
+    pdf.open_pdf(source_path=f'outer/{uii_from_table}.pdf')
+    investment_title_search_key = '1. Name of this Investment: '
+    investment_title_from_pdf = pdf.find_text(locator=f'regex:{investment_title_search_key}', pagenum=1)[0] \
+        .anchor.replace(investment_title_search_key, '')
+    uii_search_key = '2. Unique Investment Identifier'
+    uii_from_pdf = pdf.find_text(locator=f'regex:{uii_search_key}', pagenum=1)[0] \
+        .anchor.replace(f'{uii_search_key} (UII): ', '')
 
-        pdf.open_pdf(source_path=f'outer/{uii_from_table}.pdf')
-
-        investment_title_search_key = '1. Name of this Investment: '
-        investment_title_from_pdf = pdf.find_text(locator=f'regex:{investment_title_search_key}', pagenum=1)[0] \
-            .anchor.replace(investment_title_search_key, '')
-
-        uii_search_key = '2. Unique Investment Identifier'
-        uii_from_pdf = pdf.find_text(locator=f'regex:{uii_search_key}', pagenum=1)[0] \
-            .anchor.replace(f'{uii_search_key} (UII): ', '')
-
-        if investment_title_from_table.split() != investment_title_from_pdf.split():
-            logger.log(message=f'Row -- {row_data["Investment title"]} -- investment titles are not equal',
-                       level='ERROR', console=True)
-        elif uii_from_table.split() != uii_from_pdf.split():
-            logger.log(message=f'Row -- {row_data["Investment title"]} -- UII numbers are not equal',
-                       level='ERROR', console=True)
-        else:
-            logger.log(message=f'Row -- {row_data["Investment title"]} -- data is correct', console=True)
-        pdf.close_pdf()
-    file.save()
-    logger.log(message='Finished detailed agency investments function', console=True)
+    if investment_title_from_table.split() != investment_title_from_pdf.split():
+        logger.log(message=f'Row -- {row_data["Investment title"]} -- investment titles are not equal',
+                   level='ERROR', console=True)
+    elif uii_from_table.split() != uii_from_pdf.split():
+        logger.log(message=f'Row -- {row_data["Investment title"]} -- UII numbers are not equal',
+                   level='ERROR', console=True)
+    else:
+        logger.log(message=f'Row -- {row_data["Investment title"]} -- data is correct', console=True)
+    pdf.close_pdf()
 
 
 def main():
